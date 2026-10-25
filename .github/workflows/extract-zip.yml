@@ -4,7 +4,7 @@ on:
 workflow_dispatch:
 push:
 paths:
-- '*.zip'
+- 'autodeploy-platform.zip'
 
 permissions:
 contents: write
@@ -12,29 +12,25 @@ contents: write
 jobs:
 extract:
 runs-on: ubuntu-latest
+steps:
+- uses: actions/checkout@v4
 
 ```
-steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
-
-  - name: Extract ZIP files
+  - name: Extract ZIP
     run: |
       python - <<'PY'
-      import glob
-      import zipfile
-      import os
+      import zipfile, os
 
-      for path in glob.glob("*.zip"):
-          with zipfile.ZipFile(path) as z:
-              for item in z.infolist():
-                  name = item.filename.replace("\\", "/")
-                  if name.startswith("/") or ".." in name.split("/"):
-                      raise ValueError("Unsafe ZIP path detected")
-                  if not item.is_dir():
-                      os.makedirs(os.path.dirname(name) or ".", exist_ok=True)
-                      with z.open(item) as src, open(name, "wb") as dst:
-                          dst.write(src.read())
+      with zipfile.ZipFile("autodeploy-platform.zip") as z:
+          for item in z.infolist():
+              name = item.filename.replace("\\", "/")
+              if name.startswith("/") or ".." in name.split("/"):
+                  raise ValueError("Unsafe ZIP path")
+              if item.is_dir():
+                  continue
+              os.makedirs(os.path.dirname(name) or ".", exist_ok=True)
+              with z.open(item) as src, open(name, "wb") as dst:
+                  dst.write(src.read())
       PY
 
   - name: Commit extracted files
@@ -42,6 +38,6 @@ steps:
       git config user.name "github-actions[bot]"
       git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
       git add -A
-      git diff --cached --quiet || git commit -m "Extract uploaded ZIP files"
+      git diff --cached --quiet || git commit -m "Extract website ZIP"
       git push
 ```
