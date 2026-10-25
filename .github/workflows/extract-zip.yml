@@ -13,39 +13,17 @@ jobs:
 extract:
 runs-on: ubuntu-latest
 steps:
-- name: Checkout repository
-uses: actions/checkout@v4
+- uses: actions/checkout@v4
 
 ```
   - name: Extract ZIP
     run: |
-      python - <<'PY'
-      import os
-      import zipfile
+      mkdir extracted
+      unzip -o autodeploy-platform.zip -d extracted
+      cp -an extracted/. .
+      rm -rf extracted
 
-      archive = "autodeploy-platform.zip"
-
-      with zipfile.ZipFile(archive) as z:
-          for item in z.infolist():
-              name = item.filename.replace("\\", "/")
-              parts = name.split("/")
-
-              if name.startswith("/") or ".." in parts:
-                  raise ValueError("Unsafe ZIP path")
-
-              if item.is_dir():
-                  continue
-
-              if item.external_attr >> 28 == 0xA:
-                  raise ValueError("Symlinks are not allowed")
-
-              os.makedirs(os.path.dirname(name) or ".", exist_ok=True)
-
-              with z.open(item) as src, open(name, "wb") as dst:
-                  dst.write(src.read())
-      PY
-
-  - name: Commit extracted files
+  - name: Commit files
     run: |
       git config user.name "github-actions[bot]"
       git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
