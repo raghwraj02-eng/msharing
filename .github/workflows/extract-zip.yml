@@ -5,7 +5,6 @@ workflow_dispatch:
 push:
 paths:
 - "autodeploy-platform.zip"
-- ".github/workflows/extract-zip.yml"
 
 permissions:
 contents: write
@@ -13,15 +12,38 @@ contents: write
 jobs:
 extract:
 runs-on: ubuntu-latest
+steps:
+- name: Checkout repository
+uses: actions/checkout@v4
 
 ```
-steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
-
   - name: Extract ZIP
     run: |
-      python -c 'import zipfile, os; z=zipfile.ZipFile("autodeploy-platform.zip"); [(os.makedirs(os.path.dirname(n) or ".", exist_ok=True), open(n, "wb").write(z.read(i))) for i in z.infolist() if not i.is_dir() for n in [i.filename.replace("\\", "/")] if not n.startswith("/") and ".." not in n.split("/")]'
+      python - <<'PY'
+      import os
+      import zipfile
+
+      archive = "autodeploy-platform.zip"
+
+      with zipfile.ZipFile(archive) as z:
+          for item in z.infolist():
+              name = item.filename.replace("\\", "/")
+              parts = name.split("/")
+
+              if name.startswith("/") or ".." in parts:
+                  raise ValueError("Unsafe ZIP path")
+
+              if item.is_dir():
+                  continue
+
+              if item.external_attr >> 28 == 0xA:
+                  raise ValueError("Symlinks are not allowed")
+
+              os.makedirs(os.path.dirname(name) or ".", exist_ok=True)
+
+              with z.open(item) as src, open(name, "wb") as dst:
+                  dst.write(src.read())
+      PY
 
   - name: Commit extracted files
     run: |
