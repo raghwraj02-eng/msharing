@@ -1,0 +1,47 @@
+name: Extract ZIP
+
+on:
+workflow_dispatch:
+push:
+paths:
+- '*.zip'
+
+permissions:
+contents: write
+
+jobs:
+extract:
+runs-on: ubuntu-latest
+
+```
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
+
+  - name: Extract ZIP files
+    run: |
+      python - <<'PY'
+      import glob
+      import zipfile
+      import os
+
+      for path in glob.glob("*.zip"):
+          with zipfile.ZipFile(path) as z:
+              for item in z.infolist():
+                  name = item.filename.replace("\\", "/")
+                  if name.startswith("/") or ".." in name.split("/"):
+                      raise ValueError("Unsafe ZIP path detected")
+                  if not item.is_dir():
+                      os.makedirs(os.path.dirname(name) or ".", exist_ok=True)
+                      with z.open(item) as src, open(name, "wb") as dst:
+                          dst.write(src.read())
+      PY
+
+  - name: Commit extracted files
+    run: |
+      git config user.name "github-actions[bot]"
+      git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      git add -A
+      git diff --cached --quiet || git commit -m "Extract uploaded ZIP files"
+      git push
+```
